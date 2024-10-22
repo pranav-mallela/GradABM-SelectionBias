@@ -25,24 +25,22 @@ class SyntheticDataGenerator():
         end = start + timesteps
 
         prob_dist = rel_cols_df["Infectious_severe"][start:end]/rel_cols_df["Infectious_severe"][start:end].sum()
-        t = self.rng.choice(a=52, size=int(1e5), p=prob_dist)
+        t = self.rng.choice(a=52, size=int(self.dataset_size), p=prob_dist)
 
         # Sampling region
         r = self.rng.choice(a=np.arange(self.num_regions), size=self.dataset_size)
+        delta_r = self.rng.dirichlet(np.ones(self.num_demographics), size=self.num_regions) # matrix of demographic percentages by region
+        severity_score = self.rng.choice(a=np.arange(1, 11), size=self.num_regions)
 
         # Sampling demographic
-        delta_r = self.rng.dirichlet(np.ones(self.num_demographics), size=self.num_regions) # matrix of demographic percentages by region
-        d = [self.rng.choice(a=np.arange(self.num_demographics), size=self.dataset_size, p=delta_r[region]) for region in r]
+        d = np.array([self.rng.choice(a=np.arange(self.num_demographics), p=delta_r[region]) for region in r])
 
-        # model hospitalization rate for a dem d during week t 
-        # # = number of hosp. / total pop. in region r
+        # Hospitalization rate
         # case 1: all demographics have the same weekly hospitalization rate
-        # case 2: different rates per dem
-        pi_P = 0.01 * d
-        weekly_hosp_rate = expit(pi_P)
+        weekly_hosp_rate = np.array([severity_score[region]*prob_dist[time] for time, region in zip(t, r)])
 
         # simulate a biased dataset using distribution Q
-        pi_Q = expit(0.005 * d)
+        pi_Q = np.array([expit(1 * rate) for rate in weekly_hosp_rate])
 
         # indicator variable
         obs = pi_Q > self.rng.uniform(size=self.dataset_size)
